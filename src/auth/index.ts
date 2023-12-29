@@ -45,6 +45,7 @@ const getRefreshTokenEndpoint = (apiKey: string) => {
 interface CustomTokenToIdAndRefreshTokensOptions {
   tenantId?: string;
   appCheckToken?: string;
+  authDomain?: string;
 }
 
 export async function customTokenToIdAndRefreshTokens(
@@ -54,6 +55,7 @@ export async function customTokenToIdAndRefreshTokens(
 ): Promise<IdAndRefreshTokens> {
   const headers = {
     "Content-Type": "application/json",
+    "Referer": options.authDomain || "",
   };
 
   const body: object = {
@@ -121,20 +123,22 @@ const isUserNotFoundResponse = (
 
 const refreshExpiredIdToken = async (
   refreshToken: string,
-  apiKey: string
+  apiKey: string, 
+  authDomain?: string
 ): Promise<string> => {
   // https://firebase.google.com/docs/reference/rest/auth/#section-refresh-token
   const response = await fetch(getRefreshTokenEndpoint(apiKey), {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
+      "Referer": authDomain || ""
     },
     body: `grant_type=refresh_token&refresh_token=${refreshToken}`,
   });
 
   if (!response.ok) {
     const data = await response.json();
-    const errorMessage = `Error fetching access token: ${JSON.stringify(
+    const errorMessage = `ZZZError fetching access token: ${JSON.stringify(
       data.error
     )} ${data.error_description ? `(${data.error_description})` : ""}`;
 
@@ -207,9 +211,10 @@ export function getFirebaseAuth(
 
   const handleTokenRefresh = async (
     refreshToken: string,
-    firebaseApiKey: string
+    firebaseApiKey: string,
+    firebaseAuthDomain?: string,
   ): Promise<Tokens> => {
-    const newToken = await refreshExpiredIdToken(refreshToken, firebaseApiKey);
+    const newToken = await refreshExpiredIdToken(refreshToken, firebaseApiKey, firebaseAuthDomain);
     const decodedToken = await verifyIdToken(newToken);
 
     return {
@@ -326,7 +331,8 @@ export function getFirebaseAuth(
   async function getCustomIdAndRefreshTokens(
     idToken: string,
     firebaseApiKey: string,
-    appCheckToken?: string
+    appCheckToken?: string,
+    firebaseAuthDomain?: string
   ) {
     const tenant = await verifyIdToken(idToken);
     const customToken = await createCustomToken(tenant.uid);
@@ -334,6 +340,7 @@ export function getFirebaseAuth(
     return customTokenToIdAndRefreshTokens(customToken, firebaseApiKey, {
       tenantId,
       appCheckToken,
+      authDomain: firebaseAuthDomain
     });
   }
 
